@@ -3,7 +3,7 @@
 **Authority:** Canonical living implementation reference. Read this file before substantive design or coding. Historical baseline/checkpoint documents remain authoritative for the decisions they record; this file carries their current implementation state forward.
 
 **Last synchronized:** 2026-10-18
-**Current milestone:** First Candidate A vertical slice — acquisition and source-quality validation  
+**Current milestone:** First Candidate A vertical slice — first-source persistence and lineage
 **Current implementation question:** *When aggregate software-development demand appears strong, is that demand actually accessible to newly qualified workers, or is a growing share concentrated among experienced or specialized candidates?*
 
 ## Public identity and target-system description
@@ -126,7 +126,7 @@ These are deliberate engineering choices for the vertical slice, **not historica
 | Runtime | Python 3.12+ | Natural fit for acquisition, profiling, ETL/ELT and evidence processing; matches the agreed pipeline direction. | Provisional for slice |
 | HTTP client | `httpx` | Small, testable client for official APIs; no framework commitment. | Implementation choice |
 | Raw landing | Immutable NDJSON + manifest on local filesystem | Preserves source response before transformation, supports reproducibility and streaming without database coupling. | Provisional for slice |
-| Relational persistence | PostgreSQL | Free/local, SQL-oriented, strong relational constraints for provenance/ancestry, supports JSONB where source payload metadata requires it. | Provisional for slice |
+| Relational persistence | Microsoft SQL Server | Satisfies the agreed SQL-oriented storage boundary with relational constraints, `DATETIMEOFFSET`, JSON validation through `ISJSON`, mature T-SQL tooling, and local-first operation. No current requirement depends on a database-specific capability unavailable in SQL Server. | First-slice decision |
 | Automated tests | `pytest` | Lightweight, natural for Python source adapters and evidence rules. | Implementation choice |
 | User interface / visualization | None yet | The evidence path must work before a UI earns its place. | Open / deferred |
 | Serving API framework | None yet | A serving boundary is a direction, but no API framework is required by the current acquisition milestone. | Open / deferred |
@@ -246,7 +246,7 @@ Foundation established on 2026-10-17; first live-source validation continued on 
 - Unsupported Power BI assumption removed; visualization remains open.
 - .NET/C# explicitly remains optional and requirement-driven.
 - Python domain model and evidence-validation rules retained.
-- Initial PostgreSQL relational schema retained as a provisional first-slice persistence choice.
+- The relational foundation is now targeted to Microsoft SQL Server and expressed as T-SQL in `sql/001_initial_schema.sql`.
 - `ingestion_batch` lineage added to the SQL schema.
 - Primary Arbetsförmedlingen ingestion corrected from JobSearch to JobStream v2.
 - NDJSON streaming client implemented with bounded time and occupation filters.
@@ -257,11 +257,19 @@ Foundation established on 2026-10-17; first live-source validation continued on 
 - All 16 full advertisements had `experience_required = true`, while multiple advertisement texts explicitly demanded prior experience, including multi-year requirements and senior roles. The field is therefore retained as source data but rejected as a standalone entry-accessibility measure.
 - The current analytical cohort is occupation group `DJh5_yyF_hEM` (`Mjukvaru- och systemutvecklare m.fl.`, 2512): 9 of the 16 full advertisements in the first batch. The remaining 7 ads stay in raw evidence but are outside the current software-development cohort.
 - JobSearch retained only for exploratory use.
-- Unit tests cover evidence rules, JobSearch helper, JobStream contract, raw landing and field profiling.
+- Unit tests cover evidence rules, JobSearch helper, JobStream contract, raw landing, field profiling and experience-signal semantics; 23 tests passed at the latest validation gate.
 
 No societal conclusion has been produced yet. That is intentional.
 
 ## 14. Change history
+
+### 2026-10-18 — Persistence technology correction
+
+- Rechecked the original baseline before persistence implementation: the agreed direction was SQL-oriented storage while the database product and physical schema remained open.
+- Withdrew the earlier provisional database-product choice before any project database or evidence rows were created.
+- Selected Microsoft SQL Server for the first slice because it satisfies the current relational integrity, provenance, JSON-metadata, temporal and local-development requirements without requiring a second database platform.
+- Retargeted `sql/001_initial_schema.sql` to SQL Server T-SQL using `NVARCHAR`, `DATETIMEOFFSET`, `BIT`, `ISJSON`, named constraints and transactional error handling.
+- No current project requirement depends on a database-specific capability that would justify another relational engine.
 
 ### 2026-10-18 — First live-source validation and analytical cohort
 
@@ -297,7 +305,7 @@ No societal conclusion has been produced yet. That is intentional.
 ### 2026-10-17 — Technology correction
 
 - Corrected an assistant-introduced drift: Power BI had never been an agreed technology for this project and is removed from the architecture assumptions.
-- Clarified that PostgreSQL and `pytest` were new implementation choices, not earlier shared decisions.
+- Clarified that the database product and `pytest` were new implementation choices, not earlier shared decisions.
 - Recorded the governing rule that Data Engineering/system fit outranks showcasing .NET or any other framework.
 - Left UI, API framework, .NET, cloud and containers open until requirements earn them.
 
@@ -309,14 +317,14 @@ No societal conclusion has been produced yet. That is intentional.
 
 ## 15. Exact next step
 
-Persist the validated first-source-path evidence and lineage into the provisional PostgreSQL model, carrying the raw JobStream batch identity, the `DJh5_yyF_hEM` analytical-cohort decision, provider occupation metadata, the preserved raw `experience_required` value, and the validated text-derived experience-signal categories/snippets without converting them into a junior-friendliness score.
+Validate the retargeted relational foundation on the existing local **Microsoft SQL Server** environment before writing any evidence rows.
 
-The next decision gate is evidence-based:
+The persistence gate is:
 
-- Preserve the provider's raw `experience_required` value but do not translate it into junior/senior truth.
-- Detect explicit experience evidence separately: quantified year requirements, seniority/specialization wording, and qualitative prior-experience requirements.
-- Keep the matched source text/snippet so every derived signal is inspectable.
-- Treat absence of a detected experience signal as **unknown**, not as proof that an ad is entry-accessible.
-- Validate the deterministic rule manually against the first 9 in-cohort advertisements before applying it to a wider historical window.
+- Create an empty local development database dedicated to this project.
+- Apply `sql/001_initial_schema.sql` with fail-fast execution and confirm all core tables, constraints and indexes are created successfully.
+- Keep the already-landed JobStream NDJSON and manifest as the immutable raw source; do not copy raw payloads into normalized tables merely for convenience.
+- After the core schema is validated, add the smallest source-specific persistence extension required for the first JobStream path: batch lineage, provider occupation metadata, analytical-cohort membership, preserved raw `experience_required`, and validated experience-signal categories/snippets.
+- Preserve the current semantic rule that these signals are evidence features, not a junior-friendliness score.
 
-The source-semantic validation gate is now complete. PostgreSQL persistence is the next implementation boundary; no wider data window is required before that step.
+No wider JobStream window, UI, cloud deployment or additional evidence family is required before this persistence gate is complete.

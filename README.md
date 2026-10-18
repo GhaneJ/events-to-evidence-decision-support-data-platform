@@ -15,6 +15,8 @@ pip install -e ".[dev]"
 pytest
 ```
 
+Relational persistence for the current vertical slice uses **Microsoft SQL Server**. The initial T-SQL foundation is `sql/001_initial_schema.sql`.
+
 ## First real source-path commands
 
 Land a bounded Data/IT JobStream window:
