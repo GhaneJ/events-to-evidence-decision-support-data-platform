@@ -246,8 +246,10 @@ Foundation established on 2026-10-17; first live-source validation continued on 
 - Unsupported Power BI assumption removed; visualization remains open.
 - .NET/C# explicitly remains optional and requirement-driven.
 - Python domain model and evidence-validation rules retained.
-- The relational foundation is now targeted to Microsoft SQL Server and expressed as T-SQL in `sql/001_initial_schema.sql`.
-- `ingestion_batch` lineage added to the SQL schema.
+- The relational foundation is targeted to Microsoft SQL Server and expressed as T-SQL in `sql/001_initial_schema.sql`.
+- The core SQL Server schema has been validated successfully in the local `EventsToEvidence_Dev` database: 12 core user tables, 12 foreign keys, 7 check constraints and 2 intended explicit indexes.
+- `sql/002_jobstream_source_persistence.sql` has been added and validated successfully, extending the model to 15 user tables, 17 foreign keys and 11 check constraints.
+- The JobStream persistence extension adds `analytical_cohort`, `job_ad_observation` and `job_ad_experience_signal`. Batch lineage remains normalized through `evidence_item -> ingestion_batch`; raw provider payloads remain in immutable NDJSON rather than being duplicated into normalized tables.
 - Primary Arbetsförmedlingen ingestion corrected from JobSearch to JobStream v2.
 - NDJSON streaming client implemented with bounded time and occupation filters.
 - Immutable raw landing + manifest fingerprint implemented.
@@ -262,6 +264,15 @@ Foundation established on 2026-10-17; first live-source validation continued on 
 No societal conclusion has been produced yet. That is intentional.
 
 ## 14. Change history
+
+### 2026-10-18 — SQL Server persistence foundation validated
+
+- Created the empty local development database `EventsToEvidence_Dev` and applied `sql/001_initial_schema.sql` with fail-fast execution.
+- Verified 12 core user tables, 12 foreign keys, 7 check constraints and the two intended explicit indexes.
+- Added and applied `sql/002_jobstream_source_persistence.sql`.
+- Verified the extended model at 15 user tables, 17 foreign keys and 11 check constraints.
+- Kept raw JobStream NDJSON/manifest files outside the normalized relational model and preserved batch lineage through `evidence_item -> ingestion_batch`.
+- The source-specific extension stores provider occupation metadata, explicit analytical-cohort membership, preserved raw `experience_required`, validated experience-signal status and inspectable signal snippets. It does not create a junior-friendliness score.
 
 ### 2026-10-18 — Persistence technology correction
 
@@ -317,14 +328,18 @@ No societal conclusion has been produced yet. That is intentional.
 
 ## 15. Exact next step
 
-Validate the retargeted relational foundation on the existing local **Microsoft SQL Server** environment before writing any evidence rows.
+Implement the first **Python -> SQL Server persistence path** for the already-landed immutable JobStream batch `af-jobstream-20261018T092402Z-db19ff70`.
 
-The persistence gate is:
+The loader must persist only what the validated source path has earned:
 
-- Create an empty local development database dedicated to this project.
-- Apply `sql/001_initial_schema.sql` with fail-fast execution and confirm all core tables, constraints and indexes are created successfully.
-- Keep the already-landed JobStream NDJSON and manifest as the immutable raw source; do not copy raw payloads into normalized tables merely for convenience.
-- After the core schema is validated, add the smallest source-specific persistence extension required for the first JobStream path: batch lineage, provider occupation metadata, analytical-cohort membership, preserved raw `experience_required`, and validated experience-signal categories/snippets.
-- Preserve the current semantic rule that these signals are evidence features, not a junior-friendliness score.
+- register the observed-job-ads evidence family and Arbetsförmedlingen JobStream source;
+- persist the existing raw batch manifest into `ingestion_batch`, including request parameters, retrieval time, raw path, SHA-256 and the 93-record count;
+- persist the 16 full advertisements as `evidence_item` rows with source-record identity and raw-file lineage;
+- preserve provider occupation field/group/occupation metadata for all 16 full ads;
+- record explicit membership in the `DJh5_yyF_hEM` analytical cohort: 9 in-cohort and 7 out-of-cohort;
+- preserve the raw provider `experience_required` value without translating it into accessibility truth;
+- persist the validated deterministic experience-audit transformation and, for the 9 in-cohort ads, the derived status plus inspectable signal categories, source fields, matched text and snippets;
+- keep the load idempotent so rerunning the same immutable batch does not duplicate evidence;
+- perform post-load validation against the known batch totals and lineage before widening the source window.
 
-No wider JobStream window, UI, cloud deployment or additional evidence family is required before this persistence gate is complete.
+Do not create an assessment, junior-friendliness score, wider historical window, UI, cloud deployment or second evidence family until this first persistence path is validated end to end.
