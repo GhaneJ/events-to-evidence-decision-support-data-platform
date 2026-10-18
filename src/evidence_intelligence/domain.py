@@ -155,6 +155,7 @@ class EvidenceStatement:
     direction: EvidenceDirection
     classification: EvidenceClassification
     evidence_item_ids: tuple[str, ...]
+    transformation_ids: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         _required(self.statement_id, "statement_id")

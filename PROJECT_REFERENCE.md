@@ -263,10 +263,29 @@ Foundation established on 2026-10-17; first live-source validation continued on 
 - The transactional Python -> SQL Server JobStream loader has been validated end to end against the immutable 93-event batch using ODBC Driver 18 and Windows authentication.
 - The persisted batch retains the expected 16 full-ad evidence items/observations, 9 in-cohort and 7 out-of-cohort observations, 9 transformation inputs and 43 inspectable experience-signal rows. All 16 full ads retain provider occupation metadata and raw `experience_required = true`; the in-cohort status split remains 7 `explicit_threshold_or_seniority` and 2 `qualitative_experience_only`.
 - Re-running the exact same immutable batch produced identical counts, confirming idempotent behavior for this path. Database-side verification also confirmed 0 empty matched-text values and 0 empty snippets.
+- `sql/003_evidence_statement_derivation.sql` has been validated locally, extending the model to 16 user tables and 19 foreign keys while keeping 11 check constraints. It adds the explicit statement-to-transformation lineage required by the methodology.
+- The first batch-bounded evidence statement has been validated end to end in SQL Server as exactly one `observed_fact` with `context` direction, linked to exactly 9 cohort evidence items and exactly 1 deterministic experience-audit transformation.
+- The persisted statement retains the validated 7/2 split and explicitly states the 24-hour sampling limitation, that the batch does not establish the wider Swedish software-development labor-market distribution, and that raw `experience_required` is not used as an accessibility conclusion.
+- Re-running statement persistence produced identical counts, confirming idempotent statement/evidence/derivation linkage.
 
 No societal conclusion has been produced yet. That is intentional.
 
 ## 14. Change history
+
+### 2026-10-18 — First bounded evidence statement validated
+
+- Persisted one batch-bounded `observed_fact` / `context` statement for `af-jobstream-20261018T092402Z-db19ff70`.
+- Verified exactly 9 `statement_evidence` links and exactly 1 `evidence_statement_derivation` link to `experience-audit:af-jobstream-20261018T092402Z-db19ff70` (`experience-signals-v1`).
+- Verified the persisted statement retains the 7 explicit-threshold/seniority versus 2 qualitative-only split.
+- Verified the statement text explicitly limits itself to the 24-hour batch, rejects generalization to the wider Swedish software-development labor market, and does not use raw `experience_required` as an accessibility conclusion.
+- Re-ran the same statement persistence command and observed unchanged counts, validating idempotency.
+
+### 2026-10-18 — Evidence-statement derivation boundary added
+
+- Added and locally validated `sql/003_evidence_statement_derivation.sql` so an evidence statement can explicitly reference the transformation that derived it.
+- Kept the relationship normalized rather than embedding transformation metadata into statement text.
+- Extended the Python `EvidenceStatement` model with transformation lineage and implemented an idempotent SQL Server persistence path for the first batch-bounded JobStream observation.
+- The statement is deliberately classified as `observed_fact` with `context` direction; it records the one-batch sampling limitation and does not treat raw `experience_required` as an accessibility conclusion.
 
 ### 2026-10-18 — First JobStream persistence path validated end to end
 
@@ -342,17 +361,19 @@ No societal conclusion has been produced yet. That is intentional.
 
 ## 15. Exact next step
 
-Create and validate the first **bounded evidence statement** from the persisted JobStream batch before widening the time window or integrating another evidence family.
+Define and validate the **longitudinal JobStream counting/version policy** before acquiring a wider observation window.
 
-The statement must remain strictly scoped to what the first immutable batch proves:
+The current 24-hour statement is valid only for its immutable batch. A wider JobStream window can contain multiple events or versions for the same advertisement, so the platform must not silently count stream events as independent job opportunities.
 
-- express the observed 9-ad analytical-cohort result as a batch-bounded fact: 7 advertisements contain an explicit quantified experience threshold and/or constrained seniority signal, while 2 contain qualitative experience language only;
-- link the statement to the underlying persisted evidence items so every contributing advertisement remains inspectable;
-- preserve the deterministic experience-audit transformation as the derivation lineage rather than treating the statement as a free-form interpretation;
-- state the sampling limitation explicitly: one 24-hour JobStream batch is not evidence that the same proportions characterize the wider Swedish software-development labor market;
-- do not convert `experience_required` into an accessibility conclusion;
-- do not classify this one-family result as a supported interpretation or use it to answer the full investigation question.
+The next gate is therefore to:
 
-After that statement path is validated, decide the smallest justified expansion needed for the assessment: a wider JobStream observation window, an independent evidence family, or both, based on what is required to satisfy the acceptance criterion rather than on feature breadth.
+- verify the provider's update/removal semantics against the current JobStream contract and real records;
+- define the analytical unit for a wider window using stable source advertisement identity while preserving every raw event/version for provenance;
+- define how multiple full-ad versions and removal events affect which version is used for content analysis;
+- keep repeated versions from inflating advertisement counts or apparent evidence strength;
+- add deterministic tests for the chosen version-selection/counting rule;
+- validate the rule on a small bounded overlapping or adjacent JobStream sample before choosing a materially wider observation period.
 
-Do not create the final assessment, junior-friendliness score, UI, cloud deployment or AI layer at this stage.
+After the longitudinal counting rule is validated, widen JobStream only enough to make the observed-ad evidence family temporally meaningful, then add an independent evidence family required for corroboration/counter-evidence. Do not classify a one-family result as a supported interpretation.
+
+Do not yet create the final assessment, junior-friendliness score, UI, cloud deployment or AI layer.
