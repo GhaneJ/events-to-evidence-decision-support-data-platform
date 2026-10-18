@@ -259,11 +259,25 @@ Foundation established on 2026-10-17; first live-source validation continued on 
 - All 16 full advertisements had `experience_required = true`, while multiple advertisement texts explicitly demanded prior experience, including multi-year requirements and senior roles. The field is therefore retained as source data but rejected as a standalone entry-accessibility measure.
 - The current analytical cohort is occupation group `DJh5_yyF_hEM` (`Mjukvaru- och systemutvecklare m.fl.`, 2512): 9 of the 16 full advertisements in the first batch. The remaining 7 ads stay in raw evidence but are outside the current software-development cohort.
 - JobSearch retained only for exploratory use.
-- Unit tests cover evidence rules, JobSearch helper, JobStream contract, raw landing, field profiling and experience-signal semantics; 23 tests passed at the latest validation gate.
+- Unit tests cover evidence rules, JobSearch helper, JobStream contract, raw landing, field profiling and experience-signal semantics; 23 tests passed at the latest completed validation gate.
+- The transactional Python -> SQL Server JobStream loader has been validated end to end against the immutable 93-event batch using ODBC Driver 18 and Windows authentication.
+- The persisted batch retains the expected 16 full-ad evidence items/observations, 9 in-cohort and 7 out-of-cohort observations, 9 transformation inputs and 43 inspectable experience-signal rows. All 16 full ads retain provider occupation metadata and raw `experience_required = true`; the in-cohort status split remains 7 `explicit_threshold_or_seniority` and 2 `qualitative_experience_only`.
+- Re-running the exact same immutable batch produced identical counts, confirming idempotent behavior for this path. Database-side verification also confirmed 0 empty matched-text values and 0 empty snippets.
 
 No societal conclusion has been produced yet. That is intentional.
 
 ## 14. Change history
+
+### 2026-10-18 — First JobStream persistence path validated end to end
+
+- Installed `pyodbc` and connected Python to the existing local SQL Server through ODBC Driver 18 with Windows authentication.
+- Added a transactional, parameterized JobStream persistence adapter with raw-manifest SHA-256/count verification before database writes.
+- Loaded immutable batch `af-jobstream-20261018T092402Z-db19ff70` into `EventsToEvidence_Dev`.
+- Verified database invariants: 1 matching ingestion batch, 16 full-ad evidence items/observations, 9 in-cohort observations, 7 out-of-cohort observations, 9 transformation inputs and 43 experience-signal rows.
+- Verified provider metadata preservation across all 16 full ads: occupation, occupation group and occupation field concept IDs are present for all 16; raw `experience_required` remains true for all 16 and is not translated into accessibility truth.
+- Verified the in-cohort audit state remains 7 `explicit_threshold_or_seniority` and 2 `qualitative_experience_only`.
+- Re-ran the same immutable batch and observed identical counts, validating idempotent insert behavior for the first source path.
+- Verified all 43 persisted signals have non-empty matched text and non-empty inspectable snippets.
 
 ### 2026-10-18 — SQL Server persistence foundation validated
 
@@ -328,18 +342,17 @@ No societal conclusion has been produced yet. That is intentional.
 
 ## 15. Exact next step
 
-Implement the first **Python -> SQL Server persistence path** for the already-landed immutable JobStream batch `af-jobstream-20261018T092402Z-db19ff70`.
+Create and validate the first **bounded evidence statement** from the persisted JobStream batch before widening the time window or integrating another evidence family.
 
-The loader must persist only what the validated source path has earned:
+The statement must remain strictly scoped to what the first immutable batch proves:
 
-- register the observed-job-ads evidence family and Arbetsförmedlingen JobStream source;
-- persist the existing raw batch manifest into `ingestion_batch`, including request parameters, retrieval time, raw path, SHA-256 and the 93-record count;
-- persist the 16 full advertisements as `evidence_item` rows with source-record identity and raw-file lineage;
-- preserve provider occupation field/group/occupation metadata for all 16 full ads;
-- record explicit membership in the `DJh5_yyF_hEM` analytical cohort: 9 in-cohort and 7 out-of-cohort;
-- preserve the raw provider `experience_required` value without translating it into accessibility truth;
-- persist the validated deterministic experience-audit transformation and, for the 9 in-cohort ads, the derived status plus inspectable signal categories, source fields, matched text and snippets;
-- keep the load idempotent so rerunning the same immutable batch does not duplicate evidence;
-- perform post-load validation against the known batch totals and lineage before widening the source window.
+- express the observed 9-ad analytical-cohort result as a batch-bounded fact: 7 advertisements contain an explicit quantified experience threshold and/or constrained seniority signal, while 2 contain qualitative experience language only;
+- link the statement to the underlying persisted evidence items so every contributing advertisement remains inspectable;
+- preserve the deterministic experience-audit transformation as the derivation lineage rather than treating the statement as a free-form interpretation;
+- state the sampling limitation explicitly: one 24-hour JobStream batch is not evidence that the same proportions characterize the wider Swedish software-development labor market;
+- do not convert `experience_required` into an accessibility conclusion;
+- do not classify this one-family result as a supported interpretation or use it to answer the full investigation question.
 
-Do not create an assessment, junior-friendliness score, wider historical window, UI, cloud deployment or second evidence family until this first persistence path is validated end to end.
+After that statement path is validated, decide the smallest justified expansion needed for the assessment: a wider JobStream observation window, an independent evidence family, or both, based on what is required to satisfy the acceptance criterion rather than on feature breadth.
+
+Do not create the final assessment, junior-friendliness score, UI, cloud deployment or AI layer at this stage.

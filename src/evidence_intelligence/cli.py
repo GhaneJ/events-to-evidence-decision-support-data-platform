@@ -12,6 +12,7 @@ from .profiling.experience_signals import (
     audit_experience_signals_jsonl,
 )
 from .profiling.job_ads import profile_job_ads_jsonl
+from .persistence.jobstream_sqlserver import persist_jobstream_manifest_to_sqlserver
 from .sources.arbetsformedlingen import (
     DATA_IT_OCCUPATION_FIELD_CONCEPT_ID,
     JobSearchClient,
@@ -57,6 +58,15 @@ def build_parser() -> argparse.ArgumentParser:
         default=SOFTWARE_DEVELOPMENT_OCCUPATION_GROUP_ID,
     )
 
+    persist = sub.add_parser(
+        "persist-jobstream-sqlserver",
+        help="Persist one validated JobStream raw batch and lineage into SQL Server",
+    )
+    persist.add_argument("manifest", type=Path)
+    persist.add_argument("--server", default="localhost")
+    persist.add_argument("--database", default="EventsToEvidence_Dev")
+    persist.add_argument("--driver", default="ODBC Driver 18 for SQL Server")
+
     # Kept as an exploratory helper, not the ingestion boundary.
     jobsearch = sub.add_parser("jobsearch", help="Explore a small current JobSearch result")
     jobsearch.add_argument("query")
@@ -101,6 +111,16 @@ def main() -> None:
         report = audit_experience_signals_jsonl(
             args.path,
             occupation_group_id=args.occupation_group_id,
+        )
+        print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
+        return
+
+    if args.command == "persist-jobstream-sqlserver":
+        report = persist_jobstream_manifest_to_sqlserver(
+            args.manifest,
+            server=args.server,
+            database=args.database,
+            driver=args.driver,
         )
         print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
         return
