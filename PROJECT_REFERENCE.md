@@ -209,6 +209,7 @@ These rules are intentionally stricter than presentation logic and may be refine
 5. A batch manifest records source, endpoint, request parameters, retrieval time, record count and SHA-256 fingerprint.
 6. A field-coverage profiler separates full advertisements from sparse removal events and measures full-ad content fields against the full-ad denominator before we design the analytical rule.
 7. JobSearch is retained only as an exploratory helper, not as the ingestion source.
+8. A deterministic experience-signal audit filters the current analytical cohort and preserves matched text/snippets for quantified experience, qualitative experience, meritorious experience, and constrained seniority language. The audit separates explicit year-threshold/seniority evidence, qualitative requirement language, and merely meritorious experience; application instructions asking candidates to describe experience are excluded. None of these states is automatically translated into junior-friendliness, and no detected signal is reported as `unknown`.
 
 ## 11. Explicitly out of scope for the first build
 
@@ -271,6 +272,11 @@ No societal conclusion has been produced yet. That is intentional.
 - Rejected `experience_required` as a standalone accessibility signal because its documented no-experience semantics conflict with multiple ad texts in the real batch.
 - Kept Data/IT as the acquisition boundary and set `Mjukvaru- och systemutvecklare m.fl.` (`DJh5_yyF_hEM`, 2512) as the current analytical cohort for the software-development question.
 - Chose an explicit, auditable text-derived experience-signal route rather than manufacturing a junior/senior metric from sparse or contradictory structured fields.
+- Implemented the first deterministic experience-signal audit with inspectable source snippets and cohort filtering.
+- Manual validation of the first 9 cohort ads showed that all 9 contain some experience language, but only 7 contain an explicit quantified experience threshold and/or seniority signal; 2 contain qualitative experience language only. The audit therefore keeps these states separate rather than treating every experience mention as the same accessibility barrier.
+- Manual review also exposed two context risks in generic experience wording: meritorious criteria and application instructions. The audit now keeps meritorious experience separate, carries a meritorious section across consecutive experience clauses until a clear mandatory-section reset, and excludes application prompts such as requests to describe the candidate's experience.
+- Final validation against the same immutable 93-event batch passed with 23 automated tests and produced the expected 9-ad cohort split: 7 `explicit_threshold_or_seniority`, 2 `qualitative_experience_only`, 0 `meritorious_experience_only`, and 0 `unknown`. Application-instruction text was excluded, while consecutive experience clauses under `Meriterande` remained classified as meritorious.
+- The source-defined 2512 cohort contains heterogeneous occupations, including IT project-management and application-consulting roles. Occupation concept remains an explicit analysis dimension so later aggregation does not silently treat the group as homogeneous.
 
 ### 2026-10-17 — Public identity and target description
 
@@ -303,7 +309,7 @@ No societal conclusion has been produced yet. That is intentional.
 
 ## 15. Exact next step
 
-Implement and test the smallest transparent **text-derived experience-signal audit** against the current software-development cohort (`DJh5_yyF_hEM`) before increasing the data window.
+Persist the validated first-source-path evidence and lineage into the provisional PostgreSQL model, carrying the raw JobStream batch identity, the `DJh5_yyF_hEM` analytical-cohort decision, provider occupation metadata, the preserved raw `experience_required` value, and the validated text-derived experience-signal categories/snippets without converting them into a junior-friendliness score.
 
 The next decision gate is evidence-based:
 
@@ -313,4 +319,4 @@ The next decision gate is evidence-based:
 - Treat absence of a detected experience signal as **unknown**, not as proof that an ad is entry-accessible.
 - Validate the deterministic rule manually against the first 9 in-cohort advertisements before applying it to a wider historical window.
 
-After the source fields are validated, persist normalized evidence and lineage into PostgreSQL and complete the first source path end to end.
+The source-semantic validation gate is now complete. PostgreSQL persistence is the next implementation boundary; no wider data window is required before that step.

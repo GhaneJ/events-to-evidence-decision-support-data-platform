@@ -7,6 +7,10 @@ from datetime import datetime
 from pathlib import Path
 
 from .acquisition.raw_store import land_ndjson_batch
+from .profiling.experience_signals import (
+    SOFTWARE_DEVELOPMENT_OCCUPATION_GROUP_ID,
+    audit_experience_signals_jsonl,
+)
 from .profiling.job_ads import profile_job_ads_jsonl
 from .sources.arbetsformedlingen import (
     DATA_IT_OCCUPATION_FIELD_CONCEPT_ID,
@@ -42,6 +46,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     profile = sub.add_parser("profile-job-ads", help="Profile first-slice JobStream field coverage")
     profile.add_argument("path", type=Path)
+
+    audit = sub.add_parser(
+        "audit-experience-signals",
+        help="Audit explicit text-derived experience signals in the current analytical cohort",
+    )
+    audit.add_argument("path", type=Path)
+    audit.add_argument(
+        "--occupation-group-id",
+        default=SOFTWARE_DEVELOPMENT_OCCUPATION_GROUP_ID,
+    )
 
     # Kept as an exploratory helper, not the ingestion boundary.
     jobsearch = sub.add_parser("jobsearch", help="Explore a small current JobSearch result")
@@ -81,6 +95,14 @@ def main() -> None:
     if args.command == "profile-job-ads":
         report = profile_job_ads_jsonl(args.path)
         print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2, sort_keys=True))
+        return
+
+    if args.command == "audit-experience-signals":
+        report = audit_experience_signals_jsonl(
+            args.path,
+            occupation_group_id=args.occupation_group_id,
+        )
+        print(json.dumps(report.as_dict(), ensure_ascii=False, indent=2))
         return
 
     if args.command == "jobsearch":
