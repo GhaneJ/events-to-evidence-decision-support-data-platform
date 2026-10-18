@@ -2,7 +2,7 @@
 
 **Authority:** Canonical living implementation reference. Read this file before substantive design or coding. Historical baseline/checkpoint documents remain authoritative for the decisions they record; this file carries their current implementation state forward.
 
-**Last synchronized:** 2026-10-17  
+**Last synchronized:** 2026-10-18
 **Current milestone:** First Candidate A vertical slice — acquisition and source-quality validation  
 **Current implementation question:** *When aggregate software-development demand appears strong, is that demand actually accessible to newly qualified workers, or is a growing share concentrated among experienced or specialized candidates?*
 
@@ -153,6 +153,10 @@ Why JobStream rather than JobSearch: Arbetsförmedlingen's own guidance says Job
 
 The first ingestion uses a **bounded time window** and Data/IT occupation filter rather than downloading the full snapshot. This keeps the first slice small while exercising the correct ingestion contract.
 
+JobStream `/v2/stream` contains both full advertisement events and sparse removal events. Removal events remain part of the immutable raw stream and provenance, but they must not be included in denominators for full-ad content-field completeness.
+
+**Acquisition boundary vs analytical cohort:** the Data/IT occupation field `apaJ_2ja_LuF` remains the broad acquisition filter. For the current software-development question, the analytical cohort is the provider occupation group `DJh5_yyF_hEM` — **Mjukvaru- och systemutvecklare m.fl.** (2512). Ads in other Data/IT occupation groups remain in the raw evidence but are outside the current cohort. Individual occupation names are not whitelisted more narrowly at this stage because variation and specialization inside the group are part of the question being investigated; occupation and headline remain available for stratification and audit.
+
 Important limitation: job advertisements are not the whole labor market and cannot independently prove employer shortage, graduate outcomes, or causality.
 
 Official source-contract references:
@@ -203,7 +207,7 @@ These rules are intentionally stricter than presentation logic and may be refine
 3. The client requests NDJSON so responses can be streamed without loading the whole batch into memory.
 4. Raw NDJSON is landed locally without transforming source records.
 5. A batch manifest records source, endpoint, request parameters, retrieval time, record count and SHA-256 fingerprint.
-6. A field-coverage profiler measures whether the fields needed for the entry-accessibility hypothesis are actually populated before we design the analytical rule.
+6. A field-coverage profiler separates full advertisements from sparse removal events and measures full-ad content fields against the full-ad denominator before we design the analytical rule.
 7. JobSearch is retained only as an exploratory helper, not as the ingestion source.
 
 ## 11. Explicitly out of scope for the first build
@@ -222,8 +226,8 @@ These rules are intentionally stricter than presentation logic and may be refine
 
 ## 12. Current risks
 
-1. Job-ad field completeness may be insufficient for direct measurement of junior/experience accessibility.
-2. The provider notes that ad fields are inconsistently populated and interpreted; field coverage must be measured rather than assumed.
+1. Structured job-ad requirement fields are too sparse in the first real batch to support entry-accessibility measurement by themselves.
+2. The provider documents `experience_required` as indicating that no experience is required, but the first real batch shows direct conflicts with advertisement text; it must not be used as a standalone accessibility indicator.
 3. The semantics of `experience_required` and experience-level structures must be verified before analytical use; no conclusion is allowed from field names alone.
 4. Occupation and education classifications may not align cleanly across later sources.
 5. Shared evidence ancestry can create false confidence if not modeled explicitly.
@@ -233,7 +237,7 @@ These rules are intentionally stricter than presentation logic and may be refine
 
 ## 13. Current state
 
-Foundation and source-path correction completed on 2026-10-17:
+Foundation established on 2026-10-17; first live-source validation continued on 2026-10-18:
 
 - Canonical living project reference established and synchronized.
 - Documentation continuity is part of definition of done.
@@ -246,13 +250,27 @@ Foundation and source-path correction completed on 2026-10-17:
 - Primary Arbetsförmedlingen ingestion corrected from JobSearch to JobStream v2.
 - NDJSON streaming client implemented with bounded time and occupation filters.
 - Immutable raw landing + manifest fingerprint implemented.
-- Job-ad field-coverage profiler implemented.
+- Job-ad field-coverage profiler implemented and corrected so sparse removal events do not dilute full-ad content coverage.
+- First real 24-hour Data/IT JobStream batch contained 93 events: 77 removals and 16 full advertisements.
+- In the 16 full advertisements, description text, publication date and `experience_required` were present in 16/16; structured `must_have.work_experiences` and `must_have.skills` were present in 1/16 each; structured experience level was present in 0/16.
+- All 16 full advertisements had `experience_required = true`, while multiple advertisement texts explicitly demanded prior experience, including multi-year requirements and senior roles. The field is therefore retained as source data but rejected as a standalone entry-accessibility measure.
+- The current analytical cohort is occupation group `DJh5_yyF_hEM` (`Mjukvaru- och systemutvecklare m.fl.`, 2512): 9 of the 16 full advertisements in the first batch. The remaining 7 ads stay in raw evidence but are outside the current software-development cohort.
 - JobSearch retained only for exploratory use.
 - Unit tests cover evidence rules, JobSearch helper, JobStream contract, raw landing and field profiling.
 
 No societal conclusion has been produced yet. That is intentional.
 
 ## 14. Change history
+
+### 2026-10-18 — First live-source validation and analytical cohort
+
+- Ran the first real bounded Data/IT JobStream ingestion.
+- Confirmed that the 93-event batch consists of 77 sparse removals and 16 full advertisements.
+- Corrected a profiler denominator defect that had made full-ad fields appear only 17.2% complete.
+- Verified corrected full-ad coverage and retained the raw batch unchanged.
+- Rejected `experience_required` as a standalone accessibility signal because its documented no-experience semantics conflict with multiple ad texts in the real batch.
+- Kept Data/IT as the acquisition boundary and set `Mjukvaru- och systemutvecklare m.fl.` (`DJh5_yyF_hEM`, 2512) as the current analytical cohort for the software-development question.
+- Chose an explicit, auditable text-derived experience-signal route rather than manufacturing a junior/senior metric from sparse or contradictory structured fields.
 
 ### 2026-10-17 — Public identity and target description
 
@@ -285,11 +303,14 @@ No societal conclusion has been produced yet. That is intentional.
 
 ## 15. Exact next step
 
-Run the first **real bounded Data/IT JobStream batch** locally, then profile the landed data before designing any junior/senior or experience-accessibility metric.
+Implement and test the smallest transparent **text-derived experience-signal audit** against the current software-development cohort (`DJh5_yyF_hEM`) before increasing the data window.
 
 The next decision gate is evidence-based:
 
-- If `experience_required`, `must_have.work_experiences`, experience-level information and related fields have useful coverage, design the smallest transparent entry-accessibility signal from those observed fields.
-- If coverage is poor or semantics are unreliable, do **not** manufacture the signal. Record the result and switch to the next defensible evidence route (historical ads / explicit text-derived rule / another independent family) through a documented decision.
+- Preserve the provider's raw `experience_required` value but do not translate it into junior/senior truth.
+- Detect explicit experience evidence separately: quantified year requirements, seniority/specialization wording, and qualitative prior-experience requirements.
+- Keep the matched source text/snippet so every derived signal is inspectable.
+- Treat absence of a detected experience signal as **unknown**, not as proof that an ad is entry-accessible.
+- Validate the deterministic rule manually against the first 9 in-cohort advertisements before applying it to a wider historical window.
 
 After the source fields are validated, persist normalized evidence and lineage into PostgreSQL and complete the first source path end to end.

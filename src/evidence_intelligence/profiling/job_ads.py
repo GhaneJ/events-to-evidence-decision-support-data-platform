@@ -9,6 +9,8 @@ from typing import Any
 @dataclass(frozen=True, slots=True)
 class JobAdCoverageReport:
     records: int
+    removed_records: int
+    full_ad_records: int
     records_with_ad_id: int
     experience_required_present: int
     must_have_work_experiences_present: int
@@ -20,10 +22,27 @@ class JobAdCoverageReport:
 
     def as_dict(self) -> dict[str, int | float]:
         result: dict[str, int | float] = asdict(self)
-        denominator = self.records or 1
-        for key, value in tuple(result.items()):
-            if key != "records" and isinstance(value, int):
-                result[f"{key}_pct"] = round(value * 100 / denominator, 2)
+        stream_denominator = self.records or 1
+        full_ad_denominator = self.full_ad_records or 1
+
+        for key in (
+            "removed_records",
+            "full_ad_records",
+            "records_with_ad_id",
+            "occupation_field_present",
+        ):
+            result[f"{key}_pct"] = round(int(result[key]) * 100 / stream_denominator, 2)
+
+        for key in (
+            "experience_required_present",
+            "must_have_work_experiences_present",
+            "must_have_experience_level_present",
+            "must_have_skills_present",
+            "publication_date_present",
+            "description_text_present",
+        ):
+            result[f"{key}_pct"] = round(int(result[key]) * 100 / full_ad_denominator, 2)
+
         return result
 
 
@@ -50,6 +69,8 @@ def _has_experience_level(work_experiences: object) -> bool:
 def profile_job_ads_jsonl(path: Path) -> JobAdCoverageReport:
     counters = {
         "records": 0,
+        "removed_records": 0,
+        "full_ad_records": 0,
         "records_with_ad_id": 0,
         "experience_required_present": 0,
         "must_have_work_experiences_present": 0,
@@ -64,14 +85,28 @@ def profile_job_ads_jsonl(path: Path) -> JobAdCoverageReport:
         for raw_line in handle:
             if not raw_line.strip():
                 continue
+
             record = json.loads(raw_line)
             if not isinstance(record, dict):
                 continue
+
             counters["records"] += 1
             ad = _ad_payload(record)
+            is_removed = record.get("removed") is True or ad.get("removed") is True
+
+            if is_removed:
+                counters["removed_records"] += 1
+            else:
+                counters["full_ad_records"] += 1
 
             if ad.get("id"):
                 counters["records_with_ad_id"] += 1
+            if isinstance(ad.get("occupation_field"), dict):
+                counters["occupation_field_present"] += 1
+
+            if is_removed:
+                continue
+
             if "experience_required" in ad and ad.get("experience_required") is not None:
                 counters["experience_required_present"] += 1
 
@@ -82,12 +117,11 @@ def profile_job_ads_jsonl(path: Path) -> JobAdCoverageReport:
                     counters["must_have_work_experiences_present"] += 1
                     if _has_experience_level(work_experiences):
                         counters["must_have_experience_level_present"] += 1
+
                 skills = must_have.get("skills")
                 if isinstance(skills, list) and skills:
                     counters["must_have_skills_present"] += 1
 
-            if isinstance(ad.get("occupation_field"), dict):
-                counters["occupation_field_present"] += 1
             if ad.get("publication_date"):
                 counters["publication_date_present"] += 1
 
